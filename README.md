@@ -9,10 +9,10 @@ Term: Fall 2016
 + [Data link](https://courseworks2.columbia.edu/courses/11849/files/folder/Project_Files?preview=763391) - (**courseworks login required**)
 + [Data description](doc/readme.html)
 + Contributor's name:  
-    + Wanyi Zhang (wz2323)
+    + Wanyi Zhang (wz2323)  
 + **Project title**: Association mining of music and text
-+ **Project summary**: In this project, we will explore the association between music features and lyrics words from a subset of songs in [the million song data](http://labrosa.ee.columbia.edu/millionsong/). Based on the association patterns identified, we will create lyric words recommender algorithms for a piece of music (using its music features).
-+ **Methodology**: The basic idea is to get 'doc_word' (expected word prob distribution for songs) by matrix multiplication of 'doc_topics' (topic probabilities for songs) and 'word_topics' (word prob for 20 topics). 'word_topics' matrix can be obtained by topic modeling on training data. 'doc_topics' matrix can be predicted from trained random forest model. [Detailed workflow](https://github.com/TZstatsADS/Fall2016-proj4-wvz/tree/master/lib) is as follows:
++ **Project summary**: In this project, we will explore the association between music features and lyrics words from a subset of songs in the [million song data](http://labrosa.ee.columbia.edu/millionsong/). Based on the association patterns identified, we will create lyric words recommender algorithms for a piece of music (using its music features).
++ **Methodology**: The basic idea is to get 'doc_word' (expected word prob distribution for songs) by matrix multiplication of 'doc_topics' (topic probabilities for songs) and 'word_topics' (word prob for 20 topics). 'word_topics' matrix can be obtained by topic modeling on training data. 'doc_topics' matrix can be predicted from trained random forest model. [Detailed workflows](https://github.com/TZstatsADS/Fall2016-proj4-wvz/tree/master/lib) are as follows:
     + [Music features.Rmd] Extracted 1125 music features from -/analysis/ part of 2350 .h5 files:
         + 5 bar/beat/section/segment/tatum lengths (slopes in lm model)
         + 100 pitch_timbre features (using RGB feature extraction method),
