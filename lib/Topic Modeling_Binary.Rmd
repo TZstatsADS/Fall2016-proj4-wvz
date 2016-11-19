@@ -1,0 +1,140 @@
+---
+title: "Topic modeling for binary lyrics data"
+output: html_notebook
+---
+```{r}
+# FOR lYRICS
+# Topic modeling code is adapted from 'A topic model for movie review' https://cpsievert.github.io/LDAvis/reviews/reviews.html
+
+# The whole process requires data 'lyric.bi' and 'id' which are in "Lyrics process.Rmd".
+# Data preparation 
+doc.list3 = list()
+for (i in 1:2350) {
+  doc.list3[[i]] = rep(names(lyric_bi), lyric_bi[i, ])
+} # list of docs with all their words
+names(doc.list3) <- id[1:2350,] # rename the list by music id
+
+term.table3 <- table(unlist(doc.list3))
+term.table3 <- sort(term.table3, decreasing = TRUE) # terms with freq in decreasing order
+vocab3 <- names(term.table3) # word list
+
+# now put the documents into the format required by the lda package:
+get.terms3 <- function(x) {
+  index <- match(x, vocab3)
+  index <- index[!is.na(index)]
+  rbind(as.integer(index - 1), as.integer(rep(1, length(index))))
+}
+documents3 <- lapply(doc.list3, get.terms3) # standard format 
+
+
+# Compute some statistics related to the data set:
+D <- length(documents3)  # number of documents (2350)
+W <- length(vocab3)  # number of terms in the vocab (4824)
+doc.length3 <- sapply(documents3, function(x) sum(x[2, ]))  # number of tokens per document
+N <- sum(doc.length3)  # total number of tokens in the data (141,450)
+term.frequency3 <- as.integer(term.table3)  # frequencies of terms in the corpus 
+
+# MCMC and model tuning parameters:
+K <- 20
+G <- 5000
+alpha <- 0.02
+eta <- 0.02
+
+# Fit the model:
+library(lda)
+set.seed(357)
+system.time(fit3 <- lda.collapsed.gibbs.sampler(documents = documents3, K = K, vocab = vocab3, num.iterations = G, alpha = alpha, eta = eta, initial = NULL, burnin = 0, compute.log.likelihood = TRUE)) #445 s
+
+beep(2)
+
+save(doc.list3, doc.length3, documents3, fit3, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling.RData")
+ 
+```
+
+```{r}
+#visual for lyric_bi topics
+theta <- t(apply(fit3$document_sums + alpha, 2, function(x) x/sum(x)))
+phi <- t(apply(t(fit3$topics) + eta, 2, function(x) x/sum(x)))
+
+Lyricss3 <- list(phi = phi,
+                     theta = theta,
+                     doc.length = doc.length3,
+                     vocab = vocab3,
+                     term.frequency = term.frequency3)
+library(servr)
+# create the JSON object to feed the visualization:
+json3 <- createJSON(phi = Lyricss3$phi, 
+                   theta = Lyricss3$theta, 
+                   doc.length = Lyricss3$doc.length, 
+                   vocab = Lyricss3$vocab, 
+                   term.frequency = Lyricss3$term.frequency)
+
+serVis(json3, out.dir = 'vissample', open.browser = T)
+######### This one makes a lot more sense than fit2
+######### We can see Topic 3 indicating rap R&B, Topic 5 of metal, Topic 10 of religion
+```
+
+```{r}
+# topic probabilities for 2350 songs
+doc_topics = t(fit3[['document_expects']])/rowSums(t(fit3[['document_expects']])) # D*K = 2350*20
+# word prob for 20 topics
+word_topics = fit3[['topics']]/rowSums(fit3[['topics']]) # K*V = 20*4824 
+# expected word prob for 2350 songs
+doc_word = doc_topics%*%word_topics # 2350*4824 
+# visualize word probability for the 1st song
+plot(doc_word[1,], pch=19 ,cex=0.1)
+
+# Test rank prediction for the 1st song
+rank1 = rank(-doc_word[1, ], ties.method = "average") # predicted ranks of words with 1 being most likely
+temp = rank1[names(rank1) %in% doc.list3[[1]]] # ranks of true words in 1st song
+sum(temp)/doc.length3[1] # calculate true mean ranks 166.7297
+
+# What if we do random guessing?
+guess = data.frame(t(sample(1:4824)))
+colnames(guess) <- names(rank1)
+guess.rank = guess[names(guess) %in% doc.list3[[1]]]
+sum(guess.rank)/doc.length3[1] #2519.284
+# We did a pretty good job!
+
+# What if we use overall ranking as prediction?
+Overall.rank = rank(-colSums(lyric_bi))
+overall.true.rank = Overall.rank[names(Overall.rank) %in% doc.list3[[1]]]
+sum(overall.true.rank)/doc.length3[1] #180
+# We are slightly better... let's test for all songs
+MeanOA = vector()
+for (i in 1:2350){
+  oa.true = Overall.rank[names(Overall.rank) %in% doc.list3[[i]]] # ranks of true words
+  MeanOA[i] = sum(oa.true)/doc.length3[i] 
+}
+data.frame(MeanOA) # This is our baseline 
+
+# Test rank prediction for all songs
+MeanRanks = vector()
+temp.pred = vector()
+rank.true = vector()
+for (i in 1:2350){
+  temp.pred = rank(-doc_word[i, ], ties.method = "average") # predicted ranks of words
+  rank.true = temp.pred[names(temp.pred) %in% doc.list3[[i]]] # ranks of true words
+  MeanRanks[i] = sum(rank.true)/doc.length3[i] 
+}
+data.frame(MeanRanks)
+
+# Proportion that we do better than using overall ranking
+sum(MeanRanks < MeanOA)/2350 # Yay! we are better in 97.57% cases
+
+# Perfect ranking
+Perf.MeanRanks = vector()
+for (i in 1:2350){
+  Perf.MeanRanks[i] = sum(1:doc.length3[i])/doc.length3[i] 
+}
+data.frame(Perf.MeanRanks)
+
+save(doc_topics, word_topics, doc_word, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project4/Project4_Words4music/output/topic_modeling_matrices.RData")
+save(MeanOA, Perf.MeanRanks, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/rank_reference.RData")
+```
+We want to predict word probabilities for new documents by doing matrix product of 'doc_topics' and 'word_topics', 
+    where 'doc_topics' is matrix of topic probabilities for new documents, 
+    and 'word_topics' is matrix of word probabilities for each topic. 
+    
+By training topic model we got 'word_topics' matrix. As for 'doc_topics' matrix for new documents, we want to predict it using new music features. Let's now find links between music features and 'doc_topics' matrix!
+

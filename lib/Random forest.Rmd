@@ -1,0 +1,110 @@
+---
+title: "Train random forest"
+output: html_notebook
+---
+
+# Train random forest using music features and doc_topics matrix from topic modeling
+```{r}
+# sample validation set
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling_matrices.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/music_no_songs_features.RData")
+y = doc_topics # 2350*20 matrix
+set.seed(1001)
+test.id = sample(1:2350, 2350*0.1, replace = F)
+music.test.new = music.a[test.id, ]
+y.test = y[test.id, ]
+music.train.new = music.a[-test.id, ]
+y.train = y[-test.id, ]
+```
+
+```{r}
+rf.new = list()
+library(randomForest)
+
+# Tune 'mtry' parameter and train random forest
+system.time(for (i in 1:ncol(doc_topics)){
+  data.train = data.frame(cbind(music.train.new, label = y.train[,i]))
+  # bestmtry <- tuneRF(y = y.train[,i], x = music.train.new, stepFactor=1.5, improve=1e-5, ntree=300)
+  # best.mtry <- bestmtry[,1][which.min(bestmtry[,2])]
+  # It took too long to tune 'mtry' for 20 random forests, so based on tuning results we chose mtry = 169 as the best parater
+  rf.new[[i]] <- randomForest(label~., data.train, mtry=169, ntree=300)
+}) # 11:03 - 11:41
+save(rf.new, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/random_forest_fit.RData")
+plot(rf.new[[4]])
+```
+```{r}
+######## predict doc_topics matrix for validation set
+rf.pred.val = matrix(0, 235, 20)
+temp = vector()
+for (i in 1:20){
+  temp = predict(rf.new[[i]], music.test.new)
+  rf.pred.val[, i] = temp
+}  
+# rf.pred.val is our predicted doc_topics matrix for validation set
+
+val_doc_word1 = rf.pred.val %*% word_topics # predicted word probabilities for validation songs
+dim(val_doc_word1) # 235*4824 
+
+######### fill empty words in val_doc_word1 and reorder the columns
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/lyrics.RData")
+colnames(val_doc_word1)[1:10] # "the" "a"   "to"  "and" "i"  
+names(rank_common)[1:10] # "??qu??" "???caus"   "a"  "??" "??\u0096" "??" 
+
+# reorder columns to get val_doc_word
+reorder = intersect(names(rank_common), colnames(val_doc_word1))
+val_doc_word = val_doc_word1[,reorder] 
+val_doc_word[1:5, 1:9] # FINALLY IN THE RIGHT ORDER
+colnames(val_doc_word)[1:10] #"??qu??"    "???caus"   "a" ... Yes we did it
+
+# create common_val for expanded framework
+common = rbind(rank_common, rank_common) # rank_common is in lyrics.RData
+common_val = data.frame(common[rep(1,235), ])
+rownames(common_val) <- 1:235
+colnames(common_val) <- names(rank_common)
+
+# expand val_doc_word to be val_doc_word_expanded with 4973 columns
+val_doc_word_expanded = common_val*0
+val_doc_word_expanded[ ,reorder] = val_doc_word
+
+######## Test rank prediction for 235 validation songs
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling.RData")
+doc.list.test = doc.list3[test.id]
+temp = vector()
+val.rank = val_doc_word_expanded
+pred_MeanRanks = vector()
+pool_MeanRanks = vector()
+base_MeanRanks = vector()
+
+for (i in 1:235){
+  temp = rank(-val_doc_word_expanded[i, ], ties.method = "average")
+  pred.rank = rank(rowMeans(cbind(temp, rank_common)), ties.method = "random")
+  #val.rank[i, ] = pred.rank
+  pool_MeanRanks[i] = sum(pred.rank[names(pred.rank) %in% doc.list.test[[i]]])/length(doc.list.test[[i]])
+  pred_MeanRanks[i] = sum(temp[names(temp) %in% doc.list.test[[i]]])/length(doc.list.test[[i]])
+  base_MeanRanks[i] = sum(rank_common[names(rank_common) %in% doc.list.test[[i]]])/length(doc.list.test[[i]])
+}
+
+rmean = (1+5000)/2
+data.frame(pred_MeanRanks/rmean)
+data.frame(pool_MeanRanks/rmean) 
+data.frame(Perf.MeanRanks[test.id]/rmean)
+sum(pred_MeanRanks > pool_MeanRanks)/235 # 69% better than using pooled ranking
+# Therefore, we choose to use val_doc_word_expanded prediction for ranks directly rather than average with common ranks.
+```
+
+```{r}
+# Train random forest model using all 2350 songs
+rf.all = list()
+data.train = data.frame()
+system.time(for (i in 1:ncol(doc_topics)){
+  data.train = data.frame(cbind(music.a, label = y[,i]))
+  rf.all[[i]] <- randomForest(label~., data.train, mtry=169, ntree=300)
+}) # 42 min
+library(beepr)
+beep(2)
+
+save(rf.new, rf.all, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/random_forest_fit.RData")
+save(rf.all, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/trained_random_forest.RData")
+
+```
+

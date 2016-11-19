@@ -1,0 +1,146 @@
+---
+title: "Final Testing"
+data: "Nov 18, 2016"
+output: html_notebook
+---
+
+```{r}
+submission = read.csv("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/TestSongFile100/sample_submission.csv", row.names = 1)
+dim(submission) # 2350*5002
+submission[1:5, 1:50] # get a sense of what it looks like
+final_submission = submission[1:100, ]
+names(final_submission)[4:5] = names(rank_common)[1:2]
+```
+
+```{r}
+# extract test song features
+test_dir = "~/Google Drive/Columbia/5243 ADS/Project 4/TestSongFile100/"
+test_file_names = paste0(test_dir,"testsong",1:100,".h5") # 100 files
+
+### feature extraction prep 
+library(rhdf5)
+nBin <- 10
+pitch.Bin <- seq(0, 1, length.out=nBin)
+timbre.Bin <- seq(-3, 3, length.out=nBin)
+Loud.Bin <- seq(-60, 0, length.out=nBin)
+seg = vector()
+freq = data.frame()
+Loud.freq = data.frame()
+loudness = vector()
+
+track = list()
+TESTmusic = data.frame()
+temp = data.frame()
+length = vector()
+confidence = vector()
+vec = c(2,4,6,12,15)
+vec2 = c(1,3,5,7,14)
+j=0
+
+
+for (i in 1:100){
+        track <- h5read(test_file_names[i], "/analysis")
+        # transform *_start features into *_length features
+        for (k in 1:5){
+        j = vec[k]
+          if (length(track[[j]]) == 0) {
+            print(paste(test_file_names[i], names(track)[j], "col is 0"))
+            length[k] = NA
+          }
+          else{
+          lm = lm(track[[j]] ~ c(1:length(track[[j]])))
+          length[k] = lm$coefficients[2]
+          }
+        }
+        # segments_pitchs and _timbre
+        freq = as.data.frame(table(factor(findInterval(track[[11]], pitch.Bin), levels=1:nBin), factor(findInterval(scale(track[[13]]), timbre.Bin), levels=1:nBin)))
+        seg <- as.numeric(freq$Freq)/(ncol(track[[11]])*nrow(track[[11]]))
+        # segments_loudness_*
+        Loud.freq = as.data.frame(table(factor(findInterval(track[[8]], Loud.Bin), levels=1:nBin), factor(findInterval(track[[9]], pitch.Bin), levels=1:nBin), factor(findInterval(track[[10]], Loud.Bin), levels=1:nBin)))
+        loudness <- as.numeric(Loud.freq$Freq)/length(track[[8]])
+        # confidence
+        for (l in 1:5){
+        	j = vec2[l]
+            if (length(track[[j]]) == 0) {
+            print(paste(test_file_names[i], names(track)[j], "col is 0"))
+            confidence[l:l+4] = NA
+            }
+            else{
+            confidence[(4*l-3):(4*l)] = c(median(track[[j]]), sd(track[[j]]), IQR(track[[j]]), length(track[[j]]))
+            }
+        }
+        temp = cbind(data.frame(t(length)), data.frame(t(seg)), data.frame(t(loudness), data.frame(t(confidence)))) # 5 lengths, 100 pitch_timbre, 1000 loudness, 20 confidence
+        TESTmusic = rbind(TESTmusic, temp)
+} # so fast
+
+# Rename columns X1, ..., X1125
+names(TESTmusic) <- paste0('X',1:1125)
+dim(TESTmusic) # 100*1125
+
+save(TESTmusic, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/test_features.RData")
+####### Get TESTmusic as testing features
+```
+
+```{r}
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/test_features.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/random_forest_fit.RData")
+
+######## predict doc_topics matrix for 100 test songs
+rf.pred.test = matrix(0, 100, 20)
+temp = vector()
+for (i in 1:20){
+  temp = predict(rf.all[[i]], TESTmusic)
+  rf.pred.test[, i] = temp
+}  # this is our predicted doc_topics matrix
+
+# predicted word prob for 100 test songs
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling_matrices.RData")
+test_doc_word1 = rf.pred.test %*% word_topics
+dim(test_doc_word1) # 100*4824 
+
+######### fill empty words in test_doc_word1 and reorder the columns
+colnames(test_doc_word1)[1:10] # "the" "a"   "to"  "and" "i" 
+names(rank_common)[1:10] # "??qu??" "???caus"   "a"  "??" "??\u0096" "??" 
+
+# reorder columns to get test_doc_word
+reorder = intersect(names(rank_common), colnames(test_doc_word1))
+test_doc_word = test_doc_word1[,reorder] 
+test_doc_word[1:5, 1:9] # FINALLY IN THE RIGHT ORDER
+colnames(test_doc_word)[1:10] #"??qu??"    "???caus"   "a" ... Yes we did it
+
+# create common_table for expanded framework as well as baseline
+common = rbind(rank_common, rank_common)
+common_table = data.frame(common[rep(1,100), ])
+rownames(common_table) <- 1:100
+colnames(common_table) <- names(rank_common)
+
+# expand test_doc_word to be test_doc_word_expanded with 4973 columns
+test_doc_word_expanded = common_table*0
+test_doc_word_expanded[ ,reorder] = test_doc_word
+
+######### Predict ranks for 100 test songs
+temp = vector()
+test.rank = test_doc_word_expanded
+for (i in 1:100){
+  temp = rank(-test_doc_word_expanded[i, ], ties.method = "random")
+  #pred.rank = rank(rowMeans(cbind(temp, rank_common)), ties.method = "random")
+  test.rank[i, ] = temp
+}
+test.base = common_table # baseline model
+
+save(test.rank, test.base, test_doc_word_expanded, test_doc_word1, test_doc_word, common_table, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/test_ranks.RData")
+
+# format for submission
+submit_csv = final_submission
+submit_csv[ ,-c(1:3,6:30)] = test.rank
+
+baseline_csv = final_submission
+baseline_csv[ ,-c(1:3,6:30)] = test.base
+
+# save prediction results as .csv files
+write.csv(submit_csv, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/submission.csv")
+write.csv(baseline_csv, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/baseline.csv")
+
+```
+
+

@@ -1,0 +1,277 @@
+---
+title: "Music Feature Engineering"
+output: html_notebook
+---
+  
+# EDA
+```{r, warning=F}
+library(rhdf5)
+# read 4 sample files
+dir = "~/Google Drive/Columbia/5243 ADS/Project 4/Project4_data/data/"
+file_names = unlist(list.files(dir, recursive = T))
+track1 <- h5read(paste0(dir, file_names[44]), "/analysis")
+track2 <- h5read(paste0(dir, file_names[156]), "/analysis")
+track3 <- h5read(paste0(dir, file_names[2100]), "/analysis")
+track4 <- h5read(paste0(dir, file_names[2349]), "/analysis")
+
+# EDA
+names(track1) # list of 16
+track1['songs']
+
+plot(track1[['bars_start']])# linear
+plot(track1[['tatums_start']]); # linear
+plot(track1[['segments_start']]) # linear
+plot(track1[['segments_loudness_start']]) # non-linear
+# '*_start' is just the start time which is linear (except for 'segments_loudness_start')
+# therefore we can transform *_start into length of *, and respective *_confidence does not matter much
+# e.g. bars_start can be represented by length of each bar
+lm = lm(track1[['bars_start']] ~ c(1:length(track1[['bars_start']])))
+bars_length = lm$coefficients[2]
+
+# pitches and timbre are in matrix form 
+lapply(track4[c(11,13)], range) # segments_pitches has range 0 to 1
+range(scale(track3[[13]])) # after rescaling, segments_timbre have rough range -3 to 3
+
+# now left with segment loudness
+sapply(track1[8:10], range) # _max and _start have range -60 to 0
+plot(track4[[8]]);plot(track1[[8]]);plot(track3[[8]])
+hist(track4[[8]]);hist(track1[[8]]);hist(track3[[8]])
+
+# need to extract some features from confidence
+plot(track1[['beats_confidence']]); plot(track2[['beats_confidence']]); plot(track3[['beats_confidence']]); plot(track4[['beats_confidence']]) 
+summary(track1[['beats_confidence']]); summary(track2[['beats_confidence']]); summary(track3[['beats_confidence']]); summary(track4[['beats_confidence']])
+IQR(track1[['beats_confidence']]);IQR(track2[['beats_confidence']]);IQR(track3[['beats_confidence']]);IQR(track4[['beats_confidence']])
+```
+
+# Music feature extraction
+```{r}
+# read h5 files with loop
+dir = "~/Google Drive/Columbia/5243 ADS/Project 4/Project4_data/data/"
+file_names = unlist(list.files(dir, recursive = T)) # originally 2352 files
+# file_names[which.max((nchar(file_names)))] # find 2 duplicated files and mananually dropped them
+file_order = substr(file_names,7,24)
+prod(file_order == id) # the files are in the order of id
+n_files <- length(file_names)
+
+### feature extraction prep 
+nBin <- 10
+pitch.Bin <- seq(0, 1, length.out=nBin)
+timbre.Bin <- seq(-3, 3, length.out=nBin)
+Loud.Bin <- seq(-60, 0, length.out=nBin)
+seg = vector()
+freq = data.frame()
+Loud.freq = data.frame()
+loudness = vector()
+
+track = list()
+music = data.frame()
+temp = data.frame()
+length = vector()
+vec = c(2,4,6,12,16)
+
+system.time(for (i in 1:n_files){
+        track <- h5read(paste0(dir, file_names[i]), "/analysis")
+        # transform *_start features into *_length features
+        for (k in 1:5){
+        j = vec[k]
+          if (length(track[[j]]) == 0) {
+            print(paste(file_names[i], names(track)[j], "col is 0"))
+            length[k] = NA
+          }
+          else{
+          lm = lm(track[[j]] ~ c(1:length(track[[j]])))
+          length[k] = lm$coefficients[2]
+          }
+        }
+        freq = as.data.frame(table(factor(findInterval(track[[11]], pitch.Bin), levels=1:nBin), factor(findInterval(scale(track[[13]]), timbre.Bin), levels=1:nBin)))
+        seg <- as.numeric(freq$Freq)/(ncol(track[[11]])*nrow(track[[11]]))
+        
+        Loud.freq = as.data.frame(table(factor(findInterval(track[[8]], Loud.Bin), levels=1:nBin), factor(findInterval(track[[9]], pitch.Bin), levels=1:nBin), factor(findInterval(track[[10]], Loud.Bin), levels=1:nBin)))
+        loudness <- as.numeric(Loud.freq$Freq)/length(track[[8]])
+
+        temp = cbind(track[['songs']][,-c(1:3,6:21,31)], data.frame(t(length)), data.frame(t(seg)), data.frame(t(loudness)))
+        music = rbind(music, temp)
+        }) # 5.65 min 11:47-54
+#    user  system elapsed 
+# 274.569  15.727 338.575 
+names(music)[12:16] = c("bar_length", "beat_length", "section_length", "segment_length", "tatum_length") # rename last 5 features
+```
+
+# Non-supervised learning exploration 
+```{r}
+# delete 0 columns
+music.trim = music[,which(apply(music, 2, var)!=0)]
+length(music.trim) # 505 non-zero columns
+data.frame(names(music)[!names(music) %in% names(music.trim)]) # 0-columns
+
+# hierarchical clustering exploration
+hc.out = hclust(dist(music.trim), method = "complete")
+plot(hc.out)
+hc.cut = cutree(hc.out, 50)
+plot(hc.cut)
+
+# PCA exploration
+pc.out = prcomp(music.trim, scale = T, center = T)
+plot(summary(pc.out)$importance[3,], type = "b", ylab = "Cumulative Proportion of Variance Explained", xlab = "Number of Principal Components") # scree plot
+biplot(pc.out, scale=0.01, cex = 0.6)
+```
+
+The previous features extracted are not doing a good job predicting doc_topics matrix. Therefore we have to include as much as information provided to be used as features.
+```{r}
+# read h5 files with loop
+dir = "~/Google Drive/Columbia/5243 ADS/Project 4/Project4_data/data/"
+file_names = unlist(list.files(dir, recursive = T)) # originally 2352 files
+# file_names[which.max((nchar(file_names)))] # find 2 duplicated files and mananually dropped them
+n_files <- length(file_names)
+
+### feature extraction prep 
+nBin <- 10
+pitch.Bin <- seq(0, 1, length.out=nBin)
+timbre.Bin <- seq(-3, 3, length.out=nBin)
+Loud.Bin <- seq(-60, 0, length.out=nBin)
+seg = vector()
+freq = data.frame()
+Loud.freq = data.frame()
+loudness = vector()
+
+track = list()
+music = data.frame()
+temp = data.frame()
+length = vector()
+confidence = vector()
+vec = c(2,4,6,12,16)
+vec2 = c(1,3,5,7,15)
+j=0
+
+t1 = Sys.time()
+for (i in 1:n_files){
+        track <- h5read(paste0(dir, file_names[i]), "/analysis")
+        # transform *_start features into *_length features
+        for (k in 1:5){
+        j = vec[k]
+          if (length(track[[j]]) == 0) {
+            print(paste(file_names[i], names(track)[j], "col is 0"))
+            length[k] = NA
+          }
+          else{
+          lm = lm(track[[j]] ~ c(1:length(track[[j]])))
+          length[k] = lm$coefficients[2]
+          }
+        }
+        # segments_pitchs and _timbre
+        freq = as.data.frame(table(factor(findInterval(track[[11]], pitch.Bin), levels=1:nBin), factor(findInterval(scale(track[[13]]), timbre.Bin), levels=1:nBin)))
+        seg <- as.numeric(freq$Freq)/(ncol(track[[11]])*nrow(track[[11]]))
+        # segments_loudness_*
+        Loud.freq = as.data.frame(table(factor(findInterval(track[[8]], Loud.Bin), levels=1:nBin), factor(findInterval(track[[9]], pitch.Bin), levels=1:nBin), factor(findInterval(track[[10]], Loud.Bin), levels=1:nBin)))
+        loudness <- as.numeric(Loud.freq$Freq)/length(track[[8]])
+        # confidence
+        for (l in 1:5){
+        j = vec2[l]
+          if (length(track[[j]]) == 0) {
+            print(paste(file_names[i], names(track)[j], "col is 0"))
+            confidence[l:l+4] = NA
+          }
+          else{
+          confidence[(4*l-3):(4*l)] = c(median(track[[j]]), sd(track[[j]]), IQR(track[[j]]), length(track[[j]]))
+          }
+        }
+        temp = cbind(track[['songs']][,-c(1:2,7:21)], data.frame(t(length)), data.frame(t(seg)), data.frame(t(loudness), data.frame(t(confidence)))) # 13 'songs', 5 lengths, 100 pitch_timbre, 1000 loudness, 20 confidence
+        music = rbind(music, temp)
+        } # 11 min 
+t2 = Sys.time()
+t2 - t1
+
+library(beepr)
+beep(2)
+
+#names(music)[12:16] = c("bar_length", "beat_length", "section_length", "segment_length", "tatum_length") # rename last 5 features
+```
+
+```{r}
+dim(music) # 2350*1138
+
+# Rename columns X1, ..., X1138
+names(music) <- paste0('X',1:1138)
+
+# replace NA by colMeans
+music.nna = music
+for(i in 1:ncol(music.nna)){
+  music.nna[is.na(music.nna[,i]), i] <- median(music.nna[,i], na.rm = TRUE)
+}
+
+save(music, music.nna, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/music_features.RData")
+```
+
+-/analysis/songs were not allowed using any more, therefore re-extract new music features.
+```{r}
+library(rhdf5)
+
+### seg feature extraction prep 
+nBin <- 10
+pitch.Bin <- seq(0, 1, length.out=nBin)
+timbre.Bin <- seq(-3, 3, length.out=nBin)
+Loud.Bin <- seq(-60, 0, length.out=nBin)
+seg = vector()
+freq = data.frame()
+Loud.freq = data.frame()
+loudness = vector()
+
+track = list()
+temp = data.frame()
+length = vector()
+confidence = vector()
+vec = c(2,4,6,12,16)
+vec2 = c(1,3,5,7,15)
+j=0
+music.no.songs = data.frame()
+
+t1 = Sys.time()
+for (i in 1:2350){
+        track <- h5read(paste0(dir, file_names[i]), "/analysis")
+        # transform *_start features into *_length features
+        for (k in 1:5){
+        j = vec[k]
+          if (length(track[[j]]) == 0) {
+            print(paste(file_names[i], names(track)[j], "col is 0"))
+            length[k] = NA
+          }
+          else{
+          lm = lm(track[[j]] ~ c(1:length(track[[j]])))
+          length[k] = lm$coefficients[2]
+          }
+        }
+        # segments_pitchs and _timbre
+        freq = as.data.frame(table(factor(findInterval(track[[11]], pitch.Bin), levels=1:nBin), factor(findInterval(scale(track[[13]]), timbre.Bin), levels=1:nBin)))
+        seg <- as.numeric(freq$Freq)/(ncol(track[[11]])*nrow(track[[11]]))
+        # segments_loudness_*
+        Loud.freq = as.data.frame(table(factor(findInterval(track[[8]], Loud.Bin), levels=1:nBin), factor(findInterval(track[[9]], pitch.Bin), levels=1:nBin), factor(findInterval(track[[10]], Loud.Bin), levels=1:nBin)))
+        loudness <- as.numeric(Loud.freq$Freq)/length(track[[8]])
+        # confidence
+        for (l in 1:5){
+        j = vec2[l]
+          if (length(track[[j]]) == 0) {
+            print(paste(file_names[i], names(track)[j], "col is 0"))
+            confidence[l:l+4] = NA
+          }
+          else{
+          confidence[(4*l-3):(4*l)] = c(median(track[[j]]), sd(track[[j]]), IQR(track[[j]]), length(track[[j]]))
+          }
+        }
+        temp = cbind(data.frame(t(length)), data.frame(t(seg)), data.frame(t(loudness), data.frame(t(confidence)))) # 5 lengths, 100 pitch_timbre, 1000 loudness, 20 confidence
+        music.no.songs = rbind(music.no.songs, temp)
+        } # 7.27 min 
+t2 = Sys.time()
+t2 - t1
+
+# Rename columns X1, ..., X1125
+names(music.no.songs) <- paste0('X',1:1125)
+
+# replace NA by colMeans
+music.a = music.no.songs
+for(i in 1:ncol(music.a)){
+  music.a[is.na(music.a[,i]), i] <- median(music.a[,i], na.rm = TRUE)
+}
+
+save(music.no.songs, music.a, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/music_no_songs_features.RData")
+```
+

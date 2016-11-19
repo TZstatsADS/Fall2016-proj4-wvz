@@ -1,0 +1,180 @@
+---
+title: "Topic Modelling Exploration"
+output: html_notebook
+---
+Topic modelling rehearsal from https://cpsievert.github.io/LDAvis/reviews/reviews.html to get a sense of the flow.
+```{r}
+devtools::install_github("cpsievert/LDAvisData")
+library(NLP)
+library(tm)
+library(lda)
+library(LDAvis)
+
+data(reviews, package = "LDAvisData")
+vocab <- names(freq)
+
+# read in some stopwords:
+library(tm)
+stop_words <- stopwords("SMART")
+
+# pre-processing:
+reviews <- gsub("'", "", reviews)  # remove apostrophes
+reviews <- gsub("[[:punct:]]", " ", reviews)  # replace punctuation with space
+reviews <- gsub("[[:cntrl:]]", " ", reviews)  # replace control characters with space
+reviews <- gsub("^[[:space:]]+", "", reviews) # remove whitespace at beginning of documents
+reviews <- gsub("[[:space:]]+$", "", reviews) # remove whitespace at end of documents
+reviews <- tolower(reviews)  # force to lowercase
+
+# tokenize on space and output as a list:
+doc.list <- strsplit(reviews, "[[:space:]]+")
+
+# compute the table of terms:
+term.table <- table(unlist(doc.list))
+term.table <- sort(term.table, decreasing = TRUE)
+dim(term.table) # only 41533 words with decreasing order
+
+# remove terms that are stop words or occur fewer than 5 times:
+del <- names(term.table) %in% stop_words | term.table < 5
+term.table <- term.table[!del] # list of words
+vocab <- names(term.table) # unique word lists
+length(vocab) # now vocab is the 14570 words
+
+# now put the documents into the format required by the lda package:
+get.terms <- function(x) {
+  index <- match(x, vocab)
+  index <- index[!is.na(index)]
+  rbind(as.integer(index - 1), as.integer(rep(1, length(index))))
+}
+documents <- lapply(doc.list, get.terms)
+```
+
+```{r}
+# Compute some statistics related to the data set:
+D <- length(documents)  # number of documents (2,000)
+W <- length(vocab)  # number of terms in the vocab (14,568)
+doc.length <- sapply(documents, function(x) sum(x[2, ]))  # number of tokens per document [312, 288, 170, 436, 291, ...]
+N <- sum(doc.length)  # total number of tokens in the data (546,827)
+term.frequency <- as.integer(term.table)  # frequencies of terms in the corpus 
+
+# MCMC and model tuning parameters:
+K <- 20
+G <- 5000
+alpha <- 0.02
+eta <- 0.02
+
+# Fit the model:
+library(lda)
+set.seed(357)
+t1 <- Sys.time()
+fit <- lda.collapsed.gibbs.sampler(documents = documents, K = K, vocab = vocab, 
+                                   num.iterations = G, alpha = alpha, 
+                                   eta = eta, initial = NULL, burnin = 0,
+                                   compute.log.likelihood = TRUE)
+t2 <- Sys.time()
+t2 - t1  # about 20 minutes on laptop
+```
+
+```{r}
+names(fit)
+# [1] "assignments"      "topics"           "topic_sums"       "document_sums"   
+# [5] "document_expects" NA                 NA                 NA                
+# [9] NA                 "log.likelihoods" 
+which(nchar(vocab)==0) # there is an empty word "" affecting visualization below
+vocab[629] <- "NA"
+
+#visualization
+theta <- t(apply(fit$document_sums + alpha, 2, function(x) x/sum(x)))
+phi <- t(apply(t(fit$topics) + eta, 2, function(x) x/sum(x)))
+# save these, along with ??, ??, and vocab, in a list as the data object MovieReviews, which is included in the LDAvis package
+MovieReviews <- list(phi = phi,
+                     theta = theta,
+                     doc.length = doc.length,
+                     vocab = vocab,
+                     term.frequency = term.frequency)
+
+library(servr)
+# create the JSON object to feed the visualization:
+json <- createJSON(phi = MovieReviews$phi, 
+                   theta = MovieReviews$theta, 
+                   doc.length = MovieReviews$doc.length, 
+                   vocab = MovieReviews$vocab, 
+                   term.frequency = MovieReviews$term.frequency) #12:39-39
+
+serVis(json, out.dir = 'vissample', open.browser = T)
+```
+
+
+# FOR LYRICS
+```{r}
+# FOR lYRICS
+doc.list2 = list()
+for (i in 1:2350) {
+  doc.list2[[i]] = rep(names(lyric), lyric[i, ])
+} #10:42-45 # list of docs with all their words
+names(doc.list2) <- id[1:2350,]
+
+get.terms2 <- function(x) {
+  index <- match(x, vocab2)
+  index <- index[!is.na(index)]
+  rbind(as.integer(index - 1), as.integer(rep(1, length(index))))
+}
+documents2 <- lapply(doc.list2, get.terms2) # standard format 
+term.table2 <- table(unlist(doc.list2))
+term.table2 <- sort(term.table2, decreasing = TRUE) # terms with freq in decreasing order
+vocab2 <- names(term.table2) # word list
+
+# Compute some statistics related to the data set:
+D <- length(documents2)  # number of documents (2,350)
+W <- length(vocab2)  # number of terms in the vocab (4824)
+doc.length2 <- sapply(documents2, function(x) sum(x[2, ]))  # number of tokens per document [312, 288, 170, 436, 291, ...]
+N <- sum(doc.length2)  # total number of tokens in the data (141,450)
+term.frequency2 <- as.integer(term.table2)  # frequencies of terms in the corpus 
+
+# MCMC and model tuning parameters:
+K <- 20
+G <- 5000
+alpha <- 0.02
+eta <- 0.02
+
+# Fit the model:
+library(lda)
+set.seed(357)
+t1 <- Sys.time()
+fit2 <- lda.collapsed.gibbs.sampler(documents = documents2, K = K, vocab = vocab2, 
+                                   num.iterations = G, alpha = alpha, 
+                                   eta = eta, initial = NULL, burnin = 0,
+                                   compute.log.likelihood = TRUE)
+t2 <- Sys.time()
+t2 - t1  # about 38 minutes on laptop
+```
+
+```{r}
+#visual for lyric topics
+theta <- t(apply(fit2$document_sums + alpha, 2, function(x) x/sum(x)))
+phi <- t(apply(t(fit2$topics) + eta, 2, function(x) x/sum(x)))
+
+Lyricsss <- list(phi = phi,
+                     theta = theta,
+                     doc.length = doc.length2,
+                     vocab = vocab2,
+                     term.frequency = term.frequency2)
+library(servr)
+# create the JSON object to feed the visualization:
+json2 <- createJSON(phi = Lyricsss$phi, 
+                   theta = Lyricsss$theta, 
+                   doc.length = Lyricsss$doc.length, 
+                   vocab = Lyricsss$vocab, 
+                   term.frequency = Lyricsss$term.frequency)
+
+serVis(json2, out.dir = 'vissample', open.browser = T)
+```
+
+see how accurate to predict from topics to lyrics for test songs
+music features -> topics -> lyric words
+
+```{r}
+# Examine the output
+names(fit2)
+head(t(fit2[['document_sums']])); head(t(fit2[['document_expects']]))
+```
+Actually topic modeling for lyric_bi data which converts word counts into binary existence does a better job. See Topic Modeling_Binary.Rmd
