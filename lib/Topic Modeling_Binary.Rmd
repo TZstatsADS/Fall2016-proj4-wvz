@@ -6,7 +6,10 @@ output: html_notebook
 # FOR lYRICS
 # Topic modeling code is adapted from 'A topic model for movie review' https://cpsievert.github.io/LDAvis/reviews/reviews.html
 
-# The whole process requires data 'lyric.bi' and 'id' which are in "Lyrics process.Rmd".
+# Requires data 'lyric.bi' and 'id'
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/lyrics.RData")
+id = read.table("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_data/common_id.txt")
+
 # Data preparation 
 doc.list3 = list()
 for (i in 1:2350) {
@@ -45,9 +48,10 @@ library(lda)
 set.seed(357)
 system.time(fit3 <- lda.collapsed.gibbs.sampler(documents = documents3, K = K, vocab = vocab3, num.iterations = G, alpha = alpha, eta = eta, initial = NULL, burnin = 0, compute.log.likelihood = TRUE)) #445 s
 
+library(beepr)
 beep(2)
 
-save(doc.list3, doc.length3, documents3, fit3, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling.RData")
+save(doc.list3, doc.length3, documents3, fit3, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/topic_modeling.RData")
  
 ```
 
@@ -129,8 +133,8 @@ for (i in 1:2350){
 }
 data.frame(Perf.MeanRanks)
 
-save(doc_topics, word_topics, doc_word, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project4/Project4_Words4music/output/topic_modeling_matrices.RData")
-save(MeanOA, Perf.MeanRanks, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/rank_reference.RData")
+save(doc_topics, word_topics, doc_word, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project4/Fall2016-proj4-wvz/output/topic_modeling_matrices.RData")
+save(MeanOA, Perf.MeanRanks, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/rank_reference.RData")
 ```
 We want to predict word probabilities for new documents by doing matrix product of 'doc_topics' and 'word_topics', 
     where 'doc_topics' is matrix of topic probabilities for new documents, 

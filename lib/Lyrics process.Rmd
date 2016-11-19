@@ -27,5 +27,5 @@ lyric_bi[lyric_bi > 0] <- 1
 lyric_common = colSums(lyric_bi)/2350
 rank_common = rank(-lyric_common, ties.method = "random") # in the right order as in submission
 
-save(lyric, lyric_bi, lyric_common, rank_common, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/lyrics.RData")
+save(lyric, lyric_bi, lyric_common, rank_common, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/lyrics.RData")
 ```

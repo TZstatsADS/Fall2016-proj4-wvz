@@ -199,12 +199,15 @@ for(i in 1:ncol(music.nna)){
   music.nna[is.na(music.nna[,i]), i] <- median(music.nna[,i], na.rm = TRUE)
 }
 
-save(music, music.nna, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/music_features.RData")
+save(music, music.nna, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/music_features.RData")
 ```
 
 -/analysis/songs were not allowed using any more, therefore re-extract new music features.
 ```{r}
 library(rhdf5)
+dir = "~/Google Drive/Columbia/5243 ADS/Project 4/Project4_data/data/"
+file_names = unlist(list.files(dir, recursive = T)) # originally 2352 files
+n_files <- length(file_names)
 
 ### seg feature extraction prep 
 nBin <- 10
@@ -272,6 +275,6 @@ for(i in 1:ncol(music.a)){
   music.a[is.na(music.a[,i]), i] <- median(music.a[,i], na.rm = TRUE)
 }
 
-save(music.no.songs, music.a, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/music_no_songs_features.RData")
+save(music.no.songs, music.a, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/music_no_songs_features.RData")
 ```
 

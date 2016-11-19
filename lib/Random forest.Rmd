@@ -6,8 +6,8 @@ output: html_notebook
 # Train random forest using music features and doc_topics matrix from topic modeling
 ```{r}
 # sample validation set
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling_matrices.RData")
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/music_no_songs_features.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/topic_modeling_matrices.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/music_no_songs_features.RData")
 y = doc_topics # 2350*20 matrix
 set.seed(1001)
 test.id = sample(1:2350, 2350*0.1, replace = F)
@@ -29,7 +29,7 @@ system.time(for (i in 1:ncol(doc_topics)){
   # It took too long to tune 'mtry' for 20 random forests, so based on tuning results we chose mtry = 169 as the best parater
   rf.new[[i]] <- randomForest(label~., data.train, mtry=169, ntree=300)
 }) # 11:03 - 11:41
-save(rf.new, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/random_forest_fit.RData")
+save(rf.new, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/random_forest_val.RData")
 plot(rf.new[[4]])
 ```
 ```{r}
@@ -46,7 +46,7 @@ val_doc_word1 = rf.pred.val %*% word_topics # predicted word probabilities for v
 dim(val_doc_word1) # 235*4824 
 
 ######### fill empty words in val_doc_word1 and reorder the columns
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/lyrics.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/lyrics.RData")
 colnames(val_doc_word1)[1:10] # "the" "a"   "to"  "and" "i"  
 names(rank_common)[1:10] # "??qu??" "???caus"   "a"  "??" "??\u0096" "??" 
 
@@ -67,7 +67,7 @@ val_doc_word_expanded = common_val*0
 val_doc_word_expanded[ ,reorder] = val_doc_word
 
 ######## Test rank prediction for 235 validation songs
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/topic_modeling.RData")
 doc.list.test = doc.list3[test.id]
 temp = vector()
 val.rank = val_doc_word_expanded
@@ -103,8 +103,7 @@ system.time(for (i in 1:ncol(doc_topics)){
 library(beepr)
 beep(2)
 
-save(rf.new, rf.all, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/random_forest_fit.RData")
-save(rf.all, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/trained_random_forest.RData")
+save(rf.all, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/random_forest_train.RData")
 
 ```
 

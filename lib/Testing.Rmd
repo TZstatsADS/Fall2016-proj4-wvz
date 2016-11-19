@@ -77,13 +77,13 @@ for (i in 1:100){
 names(TESTmusic) <- paste0('X',1:1125)
 dim(TESTmusic) # 100*1125
 
-save(TESTmusic, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/test_features.RData")
+save(TESTmusic, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/test_features.RData")
 ####### Get TESTmusic as testing features
 ```
 
 ```{r}
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/test_features.RData")
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/random_forest_fit.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/test_features.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/random_forest_fit.RData")
 
 ######## predict doc_topics matrix for 100 test songs
 rf.pred.test = matrix(0, 100, 20)
@@ -94,7 +94,7 @@ for (i in 1:20){
 }  # this is our predicted doc_topics matrix
 
 # predicted word prob for 100 test songs
-load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/topic_modeling_matrices.RData")
+load("/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/topic_modeling_matrices.RData")
 test_doc_word1 = rf.pred.test %*% word_topics
 dim(test_doc_word1) # 100*4824 
 
@@ -128,7 +128,7 @@ for (i in 1:100){
 }
 test.base = common_table # baseline model
 
-save(test.rank, test.base, test_doc_word_expanded, test_doc_word1, test_doc_word, common_table, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/test_ranks.RData")
+save(test.rank, test.base, test_doc_word_expanded, test_doc_word1, test_doc_word, common_table, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/test_ranks.RData")
 
 # format for submission
 submit_csv = final_submission
@@ -138,8 +138,8 @@ baseline_csv = final_submission
 baseline_csv[ ,-c(1:3,6:30)] = test.base
 
 # save prediction results as .csv files
-write.csv(submit_csv, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/submission.csv")
-write.csv(baseline_csv, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Project4_Words4music/output/baseline.csv")
+write.csv(submit_csv, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/submission.csv")
+write.csv(baseline_csv, file = "/Users/mushroomvv/Google Drive/Columbia/5243 ADS/Project 4/Fall2016-proj4-wvz/output/baseline.csv")
 
 ```
 
