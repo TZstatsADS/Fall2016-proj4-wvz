@@ -13,7 +13,6 @@ Term: Fall 2016
 + Projec title: Association mining of music and text
 + Project summary: In this project, we will explore the association between music features and lyrics words from a subset of songs in [the million song data](http://labrosa.ee.columbia.edu/millionsong/). Based on the association patterns identified, we will create lyric words recommender algorithms for a piece of music (using its music features).
 + Methodology: The basic idea is to get 'doc_word' (expected word prob distribution for songs) by matrix multiplication of 'doc_topics' (topic probabilities for songs) and 'word_topics' (word prob for 20 topics). 'word_topics' matrix can be obtained by topic modeling on training data. 'doc_topics' matrix can be predicted from trained random forest model. [Detailed workflow](https://github.com/TZstatsADS/Fall2016-proj4-wvz/tree/master/lib) is as follows:
-    
     + [Music features.Rmd] Extracted 1125 music features from -/analysis/ part of 2350 .h5 files:
         + 5 bar/beat/section/segment/tatum lengths (slopes in lm model)
         + 100 pitch_timbre features (using RGB feature extraction method),
@@ -28,7 +27,7 @@ Term: Fall 2016
             + 'word_topics' (word prob for 20 topics),
         + Obtained 'doc_word' (expected word prob distribution for 2350 songs) by matrix multiplication of 'doc_topics' and 'word_topics'
         + Tested if 'doc_word' is a good prediction for word distribution in songs by comparing to baseline ranking (better for 97.6% songs)  
-By training topic model we got 'word_topics' matrix (matrix of word probabilities for 20 topics). As for 'doc_topics' matrix for new songs, we will predict it by finding links between music features and 'doc_topics' matrix! Therefore next we are going to train random forest model for such links.
+*By training topic model we got 'word_topics' matrix (matrix of word probabilities for 20 topics). As for 'doc_topics' matrix for new songs, we will predict it by finding links between music features and 'doc_topics' matrix! Therefore next we are going to train random forest model for such links.*
     + [Random forest.Rmd] 
         + Set aside 10% training data as validation set
         + Trained random forest with tuning parameter 'mtry'
